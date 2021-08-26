@@ -1,0 +1,72 @@
+---
+title: 'Time will tell: How Time active affects Diffusion'
+author: "Malte Grönemann"
+date: "12/08/2021"
+output: html_document
+runtime: shiny
+bibliography: bib.bib
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+library(ggplot2)
+library(shiny)
+library(dplyr)
+
+DTA_long <- read.table("DiffusionTimeActive.csv", # change to location of data for replication
+                      header = T,
+                      sep = ",",
+                      skip = 6) # first 6 rows only contain simulation information
+colnames(DTA_long) <- c("run", "time_active", "probability", "threshold", 
+                       "time", "n_links", "ave_path_length", "active")
+DTA_long <- DTA_long %>% arrange(run, time)
+```
+
+The following Shiny-App was used for data exploration. Some of the claims made in the article have no direct justification in the article but are based on the interpretation of the line plots shown here.
+
+The red line denotes the equilibrium state as predicted by the mathematical model. Each black line denotes a single run under the parameter conditions selected using the buttons above the graph.
+
+```{r lines}
+
+interface <- fluidPage(fluidRow(
+  column(5,
+  selectInput("probability", 
+              label = "Probability",
+              choices = unique(DTA_long$probability))),
+  column(5,
+  selectInput("time_active", 
+              label = "Average Time active",
+              choices = unique(DTA_long$time_active))),
+  column(2,
+  radioButtons("threshold", 
+               label = "Threshold",
+               choices = c(1, 2)))),
+  fluidRow(plotOutput("trajectories"))
+)
+
+server <- function(input, output){
+output$trajectories <-renderPlot({
+  
+  data <- DTA_long %>%
+    filter(probability == input$probability & 
+             time_active == input$time_active & 
+             threshold == input$threshold)
+  
+    ggplot(data) +
+    aes(x = time,
+        y = active,
+        group = run) +
+    geom_line() +
+    geom_line(aes(x = time, 
+                  y = 1 - 1 / time_active), 
+              colour = "red",
+              size = 1.5) +
+    scale_y_continuous(limits = c(0, 1),
+                       labels = scales::percent) +
+    labs(x = "Time", 
+         y = "Share of the active Population")
+    
+})}
+
+shinyApp(ui = interface, server = server, options = list(height = 500))
+```
